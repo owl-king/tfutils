@@ -7,6 +7,15 @@ Just `<leader>cv` to promt the function
 - first arg is variable name
 - second arg (optional) is description field
 
+## Installation
+With `packer` 
+```lua
+  use {                                                                       'owl-king/auto-tfvars',
+    run = ':UpdateRemotePlugins'                                          
+  }
+```
+
+
 ## Roadmap
 - [ ] Support more fields: `default`, `type`, `validation`, `sensitive` and `nullable`
 - [ ] Autocreate tf var file base on file name or module
