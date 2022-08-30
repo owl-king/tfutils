@@ -2,6 +2,8 @@
 
 auto-tfvars is built for the painless of create terraform vars in `variables.tf` file. Multiple vars file are on the roadmap.
 
+![Create var quickly](https://media.giphy.com/media/l5zwatckCFFHYeHj3u/giphy.gif)
+
 ## Installation
 With `packer` 
 ```lua
@@ -20,8 +22,7 @@ Just `<leader>cv` to promt the function
 Execute remote function with `:call`
 - :call CreateTfVarFunction(variable, description)
 
-
-
 ## Roadmap
 - [ ] Support more fields: `default`, `type`, `validation`, `sensitive` and `nullable`
 - [ ] Autocreate tf var file base on file name or module
+- [ ] Support visual mode
