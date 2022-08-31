@@ -2,12 +2,14 @@ import pathlib
 import pynvim
 
 @pynvim.plugin
-class TestPlugin:
+class TfUtils:
     def __init__(self, nvim):
         self.nvim = nvim
 
-    @pynvim.function("CreateTfVarFunction", sync=True)
-    def testcommand(self, args):
+    @pynvim.function("TfCreateVar", sync=False)
+    def create_var(self, args):
+        """Create terraform variable
+        """
         current_dir = self.nvim.command_output("pwd")
         tfvars_file_loc = current_dir + "/variables.tf"
         if not pathlib.Path(tfvars_file_loc).exists():

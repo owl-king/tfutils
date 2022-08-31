@@ -1,22 +1,23 @@
-# A simple function for coding terrform in nvim
+# Terraform utils in NeoVim
 
-auto-tfvars is built for the painless of create terraform vars in `variables.tf` file. Multiple vars file are on the roadmap.
+tfutils is built for the enhance your workflow in neovim
 
 ![Create var quickly](https://media.giphy.com/media/l5zwatckCFFHYeHj3u/giphy.gif)
+
+## Requirement
+- python3.4 or newer
 
 ## Installation
 With `packer` 
 ```lua
   use {
-    'owl-king/auto-tfvars',
+    'owl-king/tfutils',
     run = ':UpdateRemotePlugins'                                          
   }
 ```
 
 ## Usage
-Just `<leader>cv` to promt the function
-- first arg is variable name
-- second arg (optional) is description field
+TBD
 
 ## Functions
 Execute remote function with `:call`
