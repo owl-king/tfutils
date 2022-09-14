@@ -21,7 +21,9 @@ TBD
 
 ## Functions
 Execute remote function with `:call`
-- :call CreateTfVarFunction(variable, description)
+- :call TfCreateVar(variable, description)
+- :call TfViewDoc(resource_name)
+- :call TfExample(resource_name)
 
 ## Roadmap
 - [ ] Support more fields: `default`, `type`, `validation`, `sensitive` and `nullable`
