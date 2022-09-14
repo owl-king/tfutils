@@ -29,3 +29,4 @@ Execute remote function with `:call`
 - [ ] Support more fields: `default`, `type`, `validation`, `sensitive` and `nullable`
 - [ ] Autocreate tf var file base on file name or module
 - [ ] Support visual mode
+- [ ] Support cache folder
