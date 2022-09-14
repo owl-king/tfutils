@@ -47,12 +47,18 @@ variable "{variable}" {{
             "aws": {
                 "url": f"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/",
                 "regex": "^aws_(.*)",
+                "provider_version": 27638
+            },
+            "google": {
+                "url": f"https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/",
+                "regex": "^google_(.*)",
+                "provider_version": 27977
             }
         }
         for provider in supported_providers:
             result = re.findall(supported_providers[provider]["regex"], resource_name)
             if result:
-                return result[0], supported_providers[provider]["url"] + result[0]
+                return result[0], supported_providers[provider]["url"] + result[0], supported_providers[provider]["provider_version"]
         return None
 
     @pynvim.function("TfViewDoc", sync=True)
@@ -66,13 +72,17 @@ variable "{variable}" {{
     @pynvim.function("TfExample", sync=True)
     def view_example_doc(self, args):
         resource_name = args[0]
-        resource_short_name, url = self.get_provider_url(resource_name)
-        resource_url = self._get_resource_url(resource_short_name)
+        resource_short_name, url, provider_version = self.get_provider_url(resource_name)
+        resource_url = self._get_resource_url(resource_short_name, provider_version)
 
+        self.log(resource_url)
         r = requests.get(resource_url)
         content = r.json()['data']['attributes']['content']
-        regex_tf = '```terraform(.*?)```'
-        example_data = re.findall(regex_tf, content, re.DOTALL)
+        regex_tf_condtions = ['```terraform(.*?)```', '```hcl(.*?)```']
+        for regex_tf in regex_tf_condtions:
+            example_data = re.findall(regex_tf, content, re.DOTALL)
+            if example_data:
+                break
 
         buf = self._show_example_windows()
         self._update_example_windows(buf, resource_name, example_data)
@@ -109,14 +119,15 @@ variable "{variable}" {{
         win = api.open_win(buf, True, opts)
         return buf
 
-    def _get_resource_url(self, resource_name: str):
+    def _get_resource_url(self, resource_name: str, provider_version: int):
         provider_url = "https://registry.terraform.io/v2/provider-docs"
         params = {
-            "filter[provider-version]": 27638,  # hard code provide-version
+            "filter[provider-version]": provider_version,  # hard code provide-version
             "filter[category]": "resources",  # hard ccode provide resource
             "filter[slug]": resource_name,
         }
 
+        self.log(params)
         self.log(provider_url)
         res = requests.get(provider_url, params=params)
 
