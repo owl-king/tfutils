@@ -1,5 +1,11 @@
 import pathlib
+import re
 import pynvim
+import webbrowser
+import requests
+import math
+import logging
+
 
 @pynvim.plugin
 class TfUtils:
@@ -8,8 +14,7 @@ class TfUtils:
 
     @pynvim.function("TfCreateVar", sync=False)
     def create_var(self, args):
-        """Create terraform variable
-        """
+        """Create terraform variable"""
         current_dir = self.nvim.command_output("pwd")
         tfvars_file_loc = current_dir + "/variables.tf"
         if not pathlib.Path(tfvars_file_loc).exists():
@@ -35,3 +40,90 @@ variable "{variable}" {{
                         variable=variable, description=description
                     )
                 f.write(template)
+
+    def get_provider_url(self, resource_name: str):
+        """Get provider url bases on resource name"""
+        supported_providers = {
+            "aws": {
+                "url": f"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/",
+                "regex": "^aws_(.*)",
+            }
+        }
+        for provider in supported_providers:
+            result = re.findall(supported_providers[provider]["regex"], resource_name)
+            if result:
+                return result[0], supported_providers[provider]["url"] + result[0]
+        return None
+
+    @pynvim.function("TfViewDoc", sync=True)
+    def view_doc(self, args):
+        """Browse doc base on the resource name"""
+        resource_name = args[0]
+        _, url = self.get_provider_url(resource_name)
+        self.nvim.out_write("url")
+        webbrowser.open(url)
+
+    @pynvim.function("TfExample", sync=True)
+    def view_example_doc(self, args):
+        resource_name = args[0]
+        resource_short_name, url = self.get_provider_url(resource_name)
+        resource_url = self._get_resource_url(resource_short_name)
+
+        r = requests.get(resource_url)
+        content = r.json()['data']['attributes']['content']
+        regex_tf = '```terraform(.*?)```'
+        example_data = re.findall(regex_tf, content, re.DOTALL)
+
+        buf = self._show_example_windows()
+        self._update_example_windows(buf, resource_name, example_data)
+
+    def _update_example_windows(self, buf, resource, data):
+        api = self.nvim.api
+        api.buf_set_option(buf, 'modifiable', True)
+        # lines = [line + "\n============\n" for line in data]
+        lines = [line.split("\n") for line in data]
+        api.buf_set_lines(buf, 0, -1, False, [f"Examples from {resource} offcial docs"])
+        for example in lines:
+            api.buf_set_lines(buf, -1 , -1, False, example)
+            api.buf_set_lines(buf, -1 , -1, False, ["=================="])
+        api.buf_set_option(buf, 'modifiable', False)
+
+    def _show_example_windows(self):
+        api = self.nvim.api
+        buf = api.create_buf(False, True)
+        api.buf_set_option(buf, 'bufhidden', 'wipe')
+        width = api.get_option("columns")
+        height = api.get_option("lines")
+        win_height = math.ceil(height * 0.8 - 4)
+        win_width = math.ceil(width * 0.8)
+        row = math.ceil((height - win_height) / 2 - 1)
+        col = math.ceil((width - win_width) / 2)
+        opts = {
+          "style" : "minimal",
+          "relative" : "editor",
+          "width" : win_width,
+          "height" : win_height,
+          "row" : row,
+          "col" : col
+        }
+        win = api.open_win(buf, True, opts)
+        return buf
+
+    def _get_resource_url(self, resource_name: str):
+        provider_url = "https://registry.terraform.io/v2/provider-docs"
+        params = {
+            "filter[provider-version]": 27638,  # hard code provide-version
+            "filter[category]": "resources",  # hard ccode provide resource
+            "filter[slug]": resource_name,
+        }
+
+        self.log(provider_url)
+        res = requests.get(provider_url, params=params)
+
+        resource_url = res.json()["data"][0]["links"]["self"]
+        registry_url = "https://registry.terraform.io"
+        return registry_url + resource_url
+
+    def log(self, data):
+        with open('/tmp/log.txt', "a") as f:
+            f.writelines("\n" + str(data) + "\n") 
