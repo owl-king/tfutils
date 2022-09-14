@@ -5,6 +5,9 @@ import webbrowser
 import requests
 import math
 import logging
+import os
+
+DEBUG = os.getenv("DEBUG", False)
 
 
 @pynvim.plugin
@@ -75,7 +78,6 @@ variable "{variable}" {{
         resource_short_name, url, provider_version = self.get_provider_url(resource_name)
         resource_url = self._get_resource_url(resource_short_name, provider_version)
 
-        self.log(resource_url)
         r = requests.get(resource_url)
         content = r.json()['data']['attributes']['content']
         regex_tf_condtions = ['```terraform(.*?)```', '```hcl(.*?)```']
@@ -127,8 +129,6 @@ variable "{variable}" {{
             "filter[slug]": resource_name,
         }
 
-        self.log(params)
-        self.log(provider_url)
         res = requests.get(provider_url, params=params)
 
         resource_url = res.json()["data"][0]["links"]["self"]
@@ -136,5 +136,6 @@ variable "{variable}" {{
         return registry_url + resource_url
 
     def log(self, data):
-        with open('/tmp/log.txt', "a") as f:
-            f.writelines("\n" + str(data) + "\n") 
+        if DEBUG:
+            with open('/tmp/log.txt', "a") as f:
+                f.writelines("\n" + str(data) + "\n") 
