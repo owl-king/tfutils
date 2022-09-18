@@ -1,13 +1,18 @@
+import os
+import sys
 import pathlib
+
+sys.path.append(str(pathlib.Path(__file__).parent))
+
 import re
 import pynvim
 import webbrowser
 import requests
 import math
-import logging
-import os
-
-DEBUG = os.getenv("DEBUG", False)
+import cache
+import log
+import timeit
+from functools import reduce
 
 
 @pynvim.plugin
@@ -50,18 +55,23 @@ variable "{variable}" {{
             "aws": {
                 "url": f"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/",
                 "regex": "^aws_(.*)",
-                "provider_version": 27638
+                "provider_version": 27638,
             },
             "google": {
                 "url": f"https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/",
                 "regex": "^google_(.*)",
-                "provider_version": 27977
-            }
+                "provider_version": 27977,
+            },
         }
         for provider in supported_providers:
             result = re.findall(supported_providers[provider]["regex"], resource_name)
             if result:
-                return result[0], supported_providers[provider]["url"] + result[0], supported_providers[provider]["provider_version"]
+                return (
+                    result[0],
+                    supported_providers[provider]["url"] + result[0],
+                    supported_providers[provider]["provider_version"],
+                    provider,
+                )
         return None
 
     @pynvim.function("TfViewDoc", sync=True)
@@ -75,35 +85,44 @@ variable "{variable}" {{
     @pynvim.function("TfExample", sync=True)
     def view_example_doc(self, args):
         resource_name = args[0]
-        resource_short_name, url, provider_version = self.get_provider_url(resource_name)
+        resource_short_name, url, provider_version, provider = self.get_provider_url(
+            resource_name
+        )
         resource_url = self._get_resource_url(resource_short_name, provider_version)
 
-        r = requests.get(resource_url)
-        content = r.json()['data']['attributes']['content']
-        regex_tf_condtions = ['```terraform(.*?)```', '```hcl(.*?)```']
-        for regex_tf in regex_tf_condtions:
-            example_data = re.findall(regex_tf, content, re.DOTALL)
-            if example_data:
-                break
+        resource_cache = cache.TfCache(provider, resource_short_name)
+        example_data = None
+
+        if not resource_cache.exists():
+            r = requests.get(resource_url)
+            content = r.json()["data"]["attributes"]["content"]
+            example_data = []
+            regex_tf_condtions = ["```terraform(.*?)```", "```hcl(.*?)```"]
+            for regex_tf in regex_tf_condtions:
+                example_data = re.findall(regex_tf, content, re.DOTALL)
+                if example_data:
+                    break
+            resource_cache.set(example_data)
+        example_data = resource_cache.get()
 
         buf = self._show_example_windows()
         self._update_example_windows(buf, resource_name, example_data)
 
+    def _normalize_data_for_buf(self, data):
+        # Because nvim set lines does not accept line with newline
+        return [line.replace("\n", "") for line in data]
+
     def _update_example_windows(self, buf, resource, data):
         api = self.nvim.api
-        api.buf_set_option(buf, 'modifiable', True)
-        # lines = [line + "\n============\n" for line in data]
-        lines = [line.split("\n") for line in data]
+        api.buf_set_option(buf, "modifiable", True)
         api.buf_set_lines(buf, 0, -1, False, [f"Examples from {resource} offcial docs"])
-        for example in lines:
-            api.buf_set_lines(buf, -1 , -1, False, example)
-            api.buf_set_lines(buf, -1 , -1, False, ["=================="])
-        api.buf_set_option(buf, 'modifiable', False)
+        api.buf_set_lines(buf, -1, -1, False, self._normalize_data_for_buf(data))
+        api.buf_set_option(buf, "modifiable", False)
 
     def _show_example_windows(self):
         api = self.nvim.api
         buf = api.create_buf(False, True)
-        api.buf_set_option(buf, 'bufhidden', 'wipe')
+        api.buf_set_option(buf, "bufhidden", "wipe")
         width = api.get_option("columns")
         height = api.get_option("lines")
         win_height = math.ceil(height * 0.8 - 4)
@@ -111,12 +130,12 @@ variable "{variable}" {{
         row = math.ceil((height - win_height) / 2 - 1)
         col = math.ceil((width - win_width) / 2)
         opts = {
-          "style" : "minimal",
-          "relative" : "editor",
-          "width" : win_width,
-          "height" : win_height,
-          "row" : row,
-          "col" : col
+            "style": "minimal",
+            "relative": "editor",
+            "width": win_width,
+            "height": win_height,
+            "row": row,
+            "col": col,
         }
         win = api.open_win(buf, True, opts)
         return buf
@@ -134,8 +153,3 @@ variable "{variable}" {{
         resource_url = res.json()["data"][0]["links"]["self"]
         registry_url = "https://registry.terraform.io"
         return registry_url + resource_url
-
-    def log(self, data):
-        if DEBUG:
-            with open('/tmp/log.txt', "a") as f:
-                f.writelines("\n" + str(data) + "\n") 
