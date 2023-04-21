@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import os
 import pathlib
-import log
+from . import log
 
 TF_CACHE_DIR = os.getenv("TF_CACHE_DIR", pathlib.Path.home() / ".cache/nvim/tfutils")
 
